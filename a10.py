@@ -103,14 +103,41 @@ def get_birth_date(name: str) -> str:
         birth date of the given person
     """
     infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
-    pattern = r"(?:Born\D*)(?P<birth>\d{4}-\d{2}-\d{2})"
+    pattern = r"Capital\s*\n(?P<capital>[^\n]+)"
     error_text = (
         "Page infobox has no birth information (at least none in xxxx-xx-xx format)"
     )
     match = get_match(infobox_text, pattern, error_text)
 
     return match.group("birth")
+def get_death_date(name: str) -> str:
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
+    pattern = r"(?:Died[^A-Za-z0-9]*)(?P<death>\w+ \d{1,2}, \d{4})"
+    error_text = "Page infobox has no death information (in xxxx-xx-xx format)"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group("death")
 
+def get_capital(place: str) -> str:
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(place)))
+    patterns = [
+        r"Capital(?: ?\(.*?\))?:?\s*([A-Z][a-z]+(?: [A-Z][a-z]+)?)",          
+        r"Capital and largest city\s*([A-Z][a-z]+(?: [A-Z][a-z]+)?)",        
+        r"Capital city\s*([A-Z][a-z]+(?: [A-Z][a-z]+)?)",                    
+    ]
+
+    for pattern in patterns:
+        matches = re.findall(pattern, infobox_text)
+        if matches:
+            return matches[0]
+
+    raise AttributeError("Page infobox has no capital information")
+
+def get_population(place: str) -> str:
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(place)))
+    pattern = r"Population(?:[^0-9\n]+)?(?:\([^\n]*\))?[^0-9\n]*([\d,]{5,})"
+    error_text = "Page infobox has no population information"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group(1)
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
@@ -139,6 +166,14 @@ def polar_radius(matches: List[str]) -> List[str]:
         polar radius of planet
     """
     return [get_polar_radius(matches[0])]
+def death_date(matches: List[str]) -> List[str]:
+    return [get_death_date(" ".join(matches))]
+
+def capital(matches: List[str]) -> List[str]:
+    return [get_capital(" ".join(matches))]  
+
+def population(matches: List[str]) -> List[str]:
+    return [get_population(" ".join(matches))]
 
 
 # dummy argument is ignored and doesn't matter
@@ -156,6 +191,9 @@ Action = Callable[[List[str]], List[Any]]
 pa_list: List[Tuple[Pattern, Action]] = [
     ("when was % born".split(), birth_date),
     ("what is the polar radius of %".split(), polar_radius),
+    ("when did % die".split(), death_date),
+    ("what is the capital of %".split(), capital),
+    ("what is the population of %".split(), population),
     (["bye"], bye_action),
 ]
 
